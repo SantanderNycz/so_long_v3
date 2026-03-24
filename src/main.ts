@@ -169,6 +169,23 @@ async function init(): Promise<void> {
     .getElementById("restart")!
     .addEventListener("click", () => loadLevel(currentLevel));
 
+  // Tap no canvas avança/reinicia (mobile sem teclado)
+  canvas.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      if (!state) return;
+      if (state.status === "won") advanceLevel();
+      else if (state.status === "dead") loadLevel(currentLevel);
+    },
+    { passive: false },
+  );
+  canvas.addEventListener("click", () => {
+    if (!state) return;
+    if (state.status === "won") advanceLevel();
+    else if (state.status === "dead") loadLevel(currentLevel);
+  });
+
   // End screen
   document.getElementById("end-restart")?.addEventListener("click", () => {
     const ov = document.getElementById("end-overlay");
@@ -189,7 +206,7 @@ async function init(): Promise<void> {
     setTimeout(() => {
       hideForm();
       loadLevel(1);
-    }, 15000);
+    }, 4500);
   });
 
   window.addEventListener("resize", onResize);

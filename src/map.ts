@@ -22,7 +22,7 @@ export const LEVELS: LevelDef[] = [
   // ── 1 ── Tutorial sem inimigos
   {
     name: "Nível 1",
-    subtitle: "Aprende a mover-te",
+    subtitle: "Aprenda a se mover",
     enemyCount: 0,
     hunterRatio: 0,
     map: `11111111
@@ -35,7 +35,7 @@ export const LEVELS: LevelDef[] = [
   // ── 2 ── Tutorial — porta burocrática (gag: timer 5s)
   {
     name: "Nível 2",
-    subtitle: "Recolhe tudo antes de sair",
+    subtitle: "Recolha tudo antes de sair",
     enemyCount: 0,
     hunterRatio: 0,
     map: `11111111111
@@ -80,7 +80,7 @@ export const LEVELS: LevelDef[] = [
   // ── 5 ── Documento em falta (gag: C escondido)
   {
     name: "Nível 5",
-    subtitle: "Falta qualquer coisa...",
+    subtitle: "Falta algo...",
     enemyCount: 3,
     hunterRatio: 0,
     map: `11111111111111111
@@ -97,7 +97,7 @@ export const LEVELS: LevelDef[] = [
   // ── 6 ── Primeiro perseguidor
   {
     name: "Nível 6",
-    subtitle: "Eles começam a perseguir-te...",
+    subtitle: "Eles começam a te perseguir...",
     enemyCount: 3,
     hunterRatio: 0.33,
     map: `11111111111111111
@@ -154,7 +154,7 @@ export const LEVELS: LevelDef[] = [
   // ── 9 ── Linha de apoio... ocupada (gag: telefone)
   {
     name: "Nível 9",
-    subtitle: "Pede ajuda... se conseguires",
+    subtitle: "Pede ajuda... se conseguir",
     enemyCount: 4,
     hunterRatio: 0.5,
     map: `111111111111111111111
@@ -175,7 +175,7 @@ export const LEVELS: LevelDef[] = [
   // ── 10 ── O formulário final (gag: sem inimigos, formulário ao passar)
   {
     name: "Nível 10",
-    subtitle: "O fim da jornada... ou será?",
+    subtitle: "O fim da jornada... ou será que não?",
     enemyCount: 0,
     hunterRatio: 0,
     map: `11111111111111111111111

@@ -104,7 +104,7 @@ export function render(
       ctx,
       "🏆 Você ganhou, mizerávi!",
       "#22c55e",
-      "Enter → próximo nível",
+      "Enter/Toque na tela → próximo nível",
     );
   if (state.status === "dead")
     drawOverlay(
