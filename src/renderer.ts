@@ -49,7 +49,7 @@ export function render(
       } else if (c === CHAR.EXIT) {
         ctx.drawImage(assets.exit, px, py, ts, ts);
       } else if (c === CHAR.PHONE) {
-        drawPhone(ctx, px, py, ts);
+        ctx.drawImage(assets.phone, px, py, ts, ts);
       } else if (c === CHAR.HUNTER) {
         ctx.drawImage(assets.enemy[eSprite], px, py, ts, ts);
         ctx.fillStyle = "rgba(255,50,50,0.30)";
@@ -104,7 +104,7 @@ export function render(
       ctx,
       "🏆 Você ganhou, mizerávi!",
       "#22c55e",
-      "Enter/Toque na tela → próximo nível",
+      "Enter → próximo nível",
     );
   if (state.status === "dead")
     drawOverlay(
@@ -116,24 +116,6 @@ export function render(
 }
 
 // ─── Telefone ───────────────────────────────────────────────────────────────
-
-function drawPhone(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  ts: number,
-): void {
-  // Fundo azul claro
-  ctx.fillStyle = "#1e3a5f";
-  ctx.fillRect(px + ts * 0.1, py + ts * 0.1, ts * 0.8, ts * 0.8);
-  // Emoji
-  ctx.font = `${ts * 0.55}px serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("📞", px + ts * 0.5, py + ts * 0.52);
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-}
 
 // ─── Balão de fala ──────────────────────────────────────────────────────────
 

@@ -74,6 +74,7 @@ export interface Assets {
     HTMLImageElement,
     HTMLImageElement,
   ];
+  phone: HTMLImageElement;
   walls: {
     center: HTMLImageElement;
     t: HTMLImageElement;
