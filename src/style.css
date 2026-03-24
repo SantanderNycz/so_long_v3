@@ -1,4 +1,10 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --bg: #111;
@@ -11,11 +17,13 @@
   --red: #f38ba8;
 }
 
-html, body {
-  width: 100%; height: 100%;
+html,
+body {
+  width: 100%;
+  min-height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: "Segoe UI", system-ui, sans-serif;
   overflow-x: hidden;
 }
 
@@ -23,13 +31,13 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px;
-  gap: 16px;
+  padding: 12px 16px;
+  gap: 10px;
 }
 
 h1 {
-  font-size: 1.4rem;
-  letter-spacing: 0.08em;
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
   color: var(--accent);
   text-transform: uppercase;
 }
@@ -37,7 +45,6 @@ h1 {
 #loading {
   color: var(--muted);
   margin-top: 40px;
-  font-size: 1rem;
 }
 
 /* ── Main layout ── */
@@ -45,20 +52,90 @@ h1 {
   display: none;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
-  max-width: 900px;
 }
 
-/* ── Canvas wrapper ── */
+/* ── Level banner ── */
+#level-banner {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 16px;
+}
+#level-banner.flash {
+  animation: flash 0.4s ease;
+}
+@keyframes flash {
+  0% {
+    background: #3d3050;
+  }
+  100% {
+    background: var(--surface);
+  }
+}
+.lv-name {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+.lv-sub {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ── Controls ── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+button {
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+button:hover {
+  background: var(--accent);
+  color: #1a1a2e;
+}
+
+.hints {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.hints kbd {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.68rem;
+  color: var(--text);
+}
+
+/* ── Canvas ── */
 #canvas-wrap {
   border: 2px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
-  line-height: 0;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-  max-width: 100%;
   overflow: auto;
+  line-height: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  max-width: 100%;
+  max-height: calc(100vh - 160px);
 }
 
 canvas {
@@ -67,105 +144,70 @@ canvas {
   image-rendering: crisp-edges;
 }
 
-/* ── Controls row ── */
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-}
-
-select, textarea, button {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-select:focus, textarea:focus { outline: 2px solid var(--accent); }
-
-button {
-  background: var(--surface);
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-  transition: background 0.15s;
-}
-button:hover { background: var(--accent); color: #000; }
-
-#map-error {
-  color: var(--red);
-  font-size: 0.8rem;
-  min-height: 1.1em;
-}
-
-/* ── Custom map section ── */
-#custom-section {
-  width: 100%;
-}
-
-details summary {
-  cursor: pointer;
-  font-size: 0.85rem;
-  color: var(--muted);
-  user-select: none;
-  padding: 4px 0;
-}
-details summary:hover { color: var(--text); }
-
-.custom-inner {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  align-items: flex-start;
-}
-
-textarea {
-  flex: 1;
-  resize: vertical;
-  min-height: 80px;
-  font-family: monospace;
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-/* ── D-pad (mobile) ── */
+/* ── D-pad ── */
 #dpad {
   display: grid;
   grid-template-columns: repeat(3, 44px);
-  grid-template-rows:    repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
   gap: 4px;
 }
-
 #dpad button {
-  width: 44px; height: 44px;
+  width: 44px;
+  height: 44px;
   font-size: 1.2rem;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   padding: 0;
   touch-action: manipulation;
 }
-
-#btn-up    { grid-column: 2; grid-row: 1; }
-#btn-left  { grid-column: 1; grid-row: 2; }
-#btn-right { grid-column: 3; grid-row: 2; }
-#btn-down  { grid-column: 2; grid-row: 3; }
-
-/* ── Keyboard hints ── */
-.hints {
-  font-size: 0.75rem;
-  color: var(--muted);
-  text-align: center;
+#btn-up {
+  grid-column: 2;
+  grid-row: 1;
 }
-.hints kbd {
+#btn-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+#btn-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+#btn-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+/* ── End screen ── */
+#end-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.end-card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.7rem;
-  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  padding: 40px 48px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 320px;
+}
+.end-trophy {
+  font-size: 3.5rem;
+}
+.end-card h2 {
+  color: var(--accent);
+  font-size: 1.6rem;
+}
+.end-card p {
+  color: var(--muted);
+  font-size: 0.9rem;
 }

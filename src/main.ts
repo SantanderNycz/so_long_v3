@@ -1,157 +1,169 @@
-import { loadAssets } from './assets';
-import { parseMap, BUILTIN_MAPS } from './map';
-import { initGameState, tryMove, tickAnimations } from './game';
-import { render } from './renderer';
-import { TILE, type GameState, type Direction, type Assets } from './types';
-import './style.css';
+import { CHAR, MOVE_DURATION, type GameState, type Assets } from "./types";
+import { enemyFrameToSprite, getWallVariant } from "./game";
 
-// ─── State ──────────────────────────────────────────────────────────────────
+export function render(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  assets: Assets,
+  now: number,
+): void {
+  const ts = state.tileSize;
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-let state: GameState | null = null;
-let assets: Assets | null = null;
-let canvas: HTMLCanvasElement;
-let ctx: CanvasRenderingContext2D;
+  const { width: W, height: H, map, playerX, playerY, moveAnim } = state;
 
-let lastTime = 0;
-let currentMapKey = 'map_42';
-
-// ─── Game loop ───────────────────────────────────────────────────────────────
-
-function loop(now: number): void {
-  const dt = now - lastTime;
-  lastTime = now;
-
-  if (state && assets) {
-    state = tickAnimations(state, now, dt);
-    render(ctx, state, assets, now);
+  // Interpolated player position
+  let drawPX = playerX,
+    drawPY = playerY;
+  if (moveAnim) {
+    const t = Math.min(1, (now - moveAnim.startTime) / MOVE_DURATION);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    drawPX = moveAnim.fromX + (moveAnim.toX - moveAnim.fromX) * ease;
+    drawPY = moveAnim.fromY + (moveAnim.toY - moveAnim.fromY) * ease;
   }
 
-  requestAnimationFrame(loop);
-}
+  const enemySprite = enemyFrameToSprite(state.enemyFrame);
 
-// ─── Input ───────────────────────────────────────────────────────────────────
+  // Draw tiles
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const c = map[y][x];
+      const px = x * ts,
+        py = y * ts;
 
-const KEY_MAP: Record<string, Direction> = {
-  KeyW: 'up', ArrowUp: 'up', Space: 'up',
-  KeyS: 'down', ArrowDown: 'down',
-  KeyA: 'left', ArrowLeft: 'left',
-  KeyD: 'right', ArrowRight: 'right',
-};
+      ctx.drawImage(assets.bg, px, py, ts, ts);
 
-window.addEventListener('keydown', (e) => {
-  if (!state || state.status !== 'playing') {
-    if (e.code === 'Enter' || e.code === 'Space') {
-      if (state && (state.status === 'won' || state.status === 'dead'))
-        loadMap(currentMapKey);
+      if (c === CHAR.WALL) {
+        const v = getWallVariant(x, y, W, H);
+        ctx.drawImage(
+          assets.walls[v as keyof typeof assets.walls],
+          px,
+          py,
+          ts,
+          ts,
+        );
+      } else if (c === CHAR.COLLECT) {
+        ctx.drawImage(assets.chest, px, py, ts, ts);
+      } else if (c === CHAR.OPEN) {
+        ctx.drawImage(assets.chest_o, px, py, ts, ts);
+      } else if (c === CHAR.EXIT) {
+        ctx.drawImage(assets.exit, px, py, ts, ts);
+      } else if (c === CHAR.HUNTER) {
+        // Hunters: draw enemy with a red tint
+        ctx.drawImage(assets.enemy[enemySprite], px, py, ts, ts);
+        ctx.fillStyle = "rgba(255,60,60,0.35)";
+        ctx.fillRect(px, py, ts, ts);
+      } else if (
+        c === CHAR.ENEMY_R ||
+        c === CHAR.ENEMY_r ||
+        c === CHAR.ENEMY_l ||
+        c === CHAR.ENEMY_L
+      ) {
+        ctx.drawImage(assets.enemy[enemySprite], px, py, ts, ts);
+      }
     }
-    return;
   }
 
-  const dir = KEY_MAP[e.code];
-  if (!dir) return;
-  e.preventDefault();
+  // Player
+  ctx.drawImage(assets.player, drawPX * ts, drawPY * ts, ts, ts);
 
-  state = tryMove(state, dir, performance.now());
-});
+  // HUD
+  drawHUD(ctx, state, ts);
 
-// Mobile d-pad
-function bindBtn(id: string, dir: Direction): void {
-  const btn = document.getElementById(id);
-  if (!btn) return;
-  const fire = (e: Event) => {
-    e.preventDefault();
-    if (state?.status === 'playing')
-      state = tryMove(state, dir, performance.now());
-  };
-  btn.addEventListener('click', fire);
-  btn.addEventListener('touchstart', fire, { passive: false });
+  // Overlays
+  if (state.status === "won")
+    drawOverlay(
+      ctx,
+      "🏆 Você ganhou, mizerávi!",
+      "#22c55e",
+      "Enter → próximo nível",
+    );
+  if (state.status === "dead")
+    drawOverlay(
+      ctx,
+      "💀 Morreu, abestado!",
+      "#ef4444",
+      "Enter → tentar de novo",
+    );
 }
 
-// ─── Map loading ─────────────────────────────────────────────────────────────
+function drawHUD(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  ts: number,
+): void {
+  const pad = 8;
+  const left = `Movimentos: ${state.moves}   Coletáveis: ${state.collectLeft}`;
+  const right = `${state.level}/10`;
 
-function loadMap(key: string): void {
-  const raw = BUILTIN_MAPS[key];
-  if (!raw) return;
-  currentMapKey = key;
+  ctx.save();
+  ctx.font = `bold ${Math.max(11, Math.round(ts * 0.17))}px monospace`;
 
-  const parsed = parseMap(raw);
-  if (parsed.error) {
-    showError(parsed.error);
-    return;
-  }
+  // Left badge
+  const lm = ctx.measureText(left);
+  const bh = Math.max(22, Math.round(ts * 0.26));
+  drawBadge(ctx, pad, pad, lm.width + pad * 2, bh, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(left, pad * 2, pad + bh * 0.68);
 
-  // Resize canvas
-  canvas.width  = parsed.width  * TILE;
-  canvas.height = parsed.height * TILE;
+  // Right level badge
+  const rm = ctx.measureText(right);
+  const rx = ctx.canvas.width - rm.width - pad * 3;
+  drawBadge(ctx, rx, pad, rm.width + pad * 2, bh, "rgba(203,166,247,0.3)");
+  ctx.fillStyle = "#e9d8fd";
+  ctx.fillText(right, rx + pad, pad + bh * 0.68);
 
-  state = initGameState(parsed);
-  document.getElementById('map-error')!.textContent = '';
+  ctx.restore();
 }
 
-function loadCustomMap(raw: string): void {
-  const parsed = parseMap(raw);
-  if (parsed.error) {
-    showError(parsed.error);
-    return;
-  }
-  currentMapKey = '__custom__';
-  BUILTIN_MAPS['__custom__'] = raw;
-
-  canvas.width  = parsed.width  * TILE;
-  canvas.height = parsed.height * TILE;
-
-  state = initGameState(parsed);
-  document.getElementById('map-error')!.textContent = '';
+function drawBadge(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+): void {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 5);
+  ctx.fill();
 }
 
-function showError(msg: string): void {
-  document.getElementById('map-error')!.textContent = '⚠ ' + msg;
+function drawOverlay(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  color: string,
+  hint: string,
+): void {
+  const { width, height } = ctx.canvas;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.62)";
+  ctx.fillRect(0, 0, width, height);
+
+  const fs = Math.max(16, Math.min(28, Math.round(width / 18)));
+  ctx.font = `bold ${fs}px monospace`;
+  const tm = ctx.measureText(text);
+  const cw = tm.width + 48,
+    ch = fs * 2.8;
+  const cx = (width - cw) / 2,
+    cy = (height - ch) / 2 - ch * 0.3;
+
+  ctx.fillStyle = color + "cc";
+  ctx.beginPath();
+  ctx.roundRect(cx, cy, cw, ch, 10);
+  ctx.fill();
+
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, cx + 24, cy + ch / 2);
+
+  // Hint text below
+  ctx.font = `${Math.round(fs * 0.65)}px monospace`;
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.textBaseline = "top";
+  const hm = ctx.measureText(hint);
+  ctx.fillText(hint, (width - hm.width) / 2, cy + ch + 10);
+
+  ctx.restore();
 }
-
-// ─── Bootstrap ───────────────────────────────────────────────────────────────
-
-async function init(): Promise<void> {
-  canvas = document.getElementById('game') as HTMLCanvasElement;
-  ctx = canvas.getContext('2d')!;
-
-  // Loading screen
-  const loading = document.getElementById('loading')!;
-  const ui = document.getElementById('ui')!;
-
-  try {
-    assets = await loadAssets('/assets');
-  } catch (e) {
-    loading.textContent = '❌ Erro ao carregar assets.';
-    return;
-  }
-
-  loading.style.display = 'none';
-  ui.style.display = 'flex';
-
-  // Bind map selector
-  const sel = document.getElementById('map-select') as HTMLSelectElement;
-  sel.addEventListener('change', () => loadMap(sel.value));
-
-  // Custom map textarea
-  const loadBtn = document.getElementById('load-custom')!;
-  const textarea = document.getElementById('custom-map') as HTMLTextAreaElement;
-  loadBtn.addEventListener('click', () => {
-    if (textarea.value.trim()) loadCustomMap(textarea.value.trim());
-  });
-
-  // Restart button
-  document.getElementById('restart')!.addEventListener('click', () => loadMap(currentMapKey));
-
-  // D-pad
-  bindBtn('btn-up', 'up');
-  bindBtn('btn-down', 'down');
-  bindBtn('btn-left', 'left');
-  bindBtn('btn-right', 'right');
-
-  loadMap('map_42');
-
-  lastTime = performance.now();
-  requestAnimationFrame(loop);
-}
-
-document.addEventListener('DOMContentLoaded', init);

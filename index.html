@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>So Long – Web Edition</title>
   <link rel="icon" type="image/png" href="/assets/player.png" />
 </head>
+
 <body>
   <h1>🗝 So Long</h1>
 
@@ -13,17 +15,19 @@
 
   <div id="ui">
 
-    <!-- Controls row -->
+    <!-- Level banner -->
+    <div id="level-banner">
+      <span class="lv-name">Nível 1</span>
+      <span class="lv-sub">Aprende a mover-te</span>
+    </div>
+
+    <!-- Restart -->
     <div class="controls">
-      <label for="map-select" style="font-size:0.85rem;color:var(--muted)">Mapa:</label>
-      <select id="map-select">
-        <option value="map_42">map_42 (original)</option>
-        <option value="map_2">map_2</option>
-        <option value="map_3">map_3</option>
-        <option value="small">small</option>
-      </select>
-      <button id="restart">↺ Reiniciar</button>
-      <span id="map-error"></span>
+      <button id="restart">↺ Reiniciar nível</button>
+      <span class="hints">
+        Mover: <kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd> &nbsp;·&nbsp;
+        Avançar / Reiniciar: <kbd>Enter</kbd>
+      </span>
     </div>
 
     <!-- Canvas -->
@@ -39,24 +43,19 @@
       <button id="btn-down">▼</button>
     </div>
 
-    <p class="hints">
-      Mover: <kbd>W A S D</kbd> ou <kbd>↑ ↓ ← →</kbd> &nbsp;·&nbsp;
-      Reiniciar: <kbd>Enter</kbd>
-    </p>
+  </div>
 
-    <!-- Custom map loader -->
-    <div id="custom-section">
-      <details>
-        <summary>📂 Carregar mapa personalizado (.ber)</summary>
-        <div class="custom-inner">
-          <textarea id="custom-map" placeholder="Cole aqui o conteúdo de um ficheiro .ber&#10;Exemplo:&#10;11111&#10;1P0E1&#10;10C01&#10;11111"></textarea>
-          <button id="load-custom">Carregar</button>
-        </div>
-      </details>
+  <!-- End screen overlay -->
+  <div id="end-overlay">
+    <div class="end-card">
+      <div class="end-trophy">🏆</div>
+      <h2>Parabéns!</h2>
+      <p>Completaste todos os 10 níveis.</p>
+      <button id="end-restart">Jogar de novo</button>
     </div>
-
   </div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>
+
 </html>
