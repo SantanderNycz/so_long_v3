@@ -13,18 +13,18 @@ export interface ParsedMap {
 export interface LevelDef {
   name: string;
   subtitle: string;
-  hasEnemies: boolean;
-  chasing: boolean;
+  enemyCount: number; // número fixo de inimigos
+  hunterRatio: number; // fracção de inimigos que perseguem (0..1)
   map: string;
 }
 
 export const LEVELS: LevelDef[] = [
-  // ── 1 ── Tutorial: siga o caminho
+  // ── 1 ── Tutorial sem inimigos
   {
     name: "Nível 1",
     subtitle: "Aprende a mover-te",
-    hasEnemies: false,
-    chasing: false,
+    enemyCount: 0,
+    hunterRatio: 0,
     map: `11111111
 1P00C001
 100000E1
@@ -32,12 +32,12 @@ export const LEVELS: LevelDef[] = [
 11111111`,
   },
 
-  // ── 2 ── Tutorial: primeiro labirinto
+  // ── 2 ── Tutorial — porta burocrática (gag: timer 5s)
   {
     name: "Nível 2",
     subtitle: "Recolhe tudo antes de sair",
-    hasEnemies: false,
-    chasing: false,
+    enemyCount: 0,
+    hunterRatio: 0,
     map: `11111111111
 1P000000001
 10C000C0001
@@ -46,12 +46,12 @@ export const LEVELS: LevelDef[] = [
 11111111111`,
   },
 
-  // ── 3 ── Primeiros inimigos (aleatórios)
+  // ── 3 ── Primeiros inimigos (aleatórios, fáceis)
   {
     name: "Nível 3",
     subtitle: "Cuidado — há inimigos",
-    hasEnemies: true,
-    chasing: false,
+    enemyCount: 2,
+    hunterRatio: 0,
     map: `1111111111111
 1P00000000001
 10C0110000001
@@ -61,12 +61,12 @@ export const LEVELS: LevelDef[] = [
 1111111111111`,
   },
 
-  // ── 4 ── Mais inimigos, mais paredes
+  // ── 4 ── Um inimigo a mais
   {
     name: "Nível 4",
     subtitle: "Mais inimigos, mais armadilhas",
-    hasEnemies: true,
-    chasing: false,
+    enemyCount: 3,
+    hunterRatio: 0,
     map: `111111111111111
 1P0000000000001
 10C00110000C001
@@ -77,12 +77,12 @@ export const LEVELS: LevelDef[] = [
 111111111111111`,
   },
 
-  // ── 5 ── Inimigos densos, mapa maior
+  // ── 5 ── Documento em falta (gag: C escondido)
   {
     name: "Nível 5",
-    subtitle: "Os inimigos proliferam",
-    hasEnemies: true,
-    chasing: false,
+    subtitle: "Falta qualquer coisa...",
+    enemyCount: 3,
+    hunterRatio: 0,
     map: `11111111111111111
 1P000000000000001
 10C001100C0000001
@@ -94,12 +94,12 @@ export const LEVELS: LevelDef[] = [
 11111111111111111`,
   },
 
-  // ── 6 ── Primeiros perseguidores
+  // ── 6 ── Primeiro perseguidor
   {
     name: "Nível 6",
     subtitle: "Eles começam a perseguir-te...",
-    hasEnemies: true,
-    chasing: true,
+    enemyCount: 3,
+    hunterRatio: 0.33,
     map: `11111111111111111
 1P000000000000001
 10C001100C0000001
@@ -112,31 +112,31 @@ export const LEVELS: LevelDef[] = [
 11111111111111111`,
   },
 
-  // ── 7 ── Mais perseguidores
+  // ── 7 ── Múltiplas agências (gag: 5 portas, 4 falsas)
   {
     name: "Nível 7",
-    subtitle: "Sem sítio para se esconder",
-    hasEnemies: true,
-    chasing: true,
+    subtitle: "Qual será a porta certa?",
+    enemyCount: 3,
+    hunterRatio: 0.33,
     map: `1111111111111111111
-1P00000000000000001
+1P00000E00000000001
 10C00110000C0000001
 10000110000000C0001
-10000000000000C0001
+1E000000000000C0001
 10001100000000E0001
-10000000000C00C0001
+10E00000000C00C0001
 10011000000000C0001
 10000000000C0000001
-1000000000000000001
+1000000000000000E01
 1111111111111111111`,
   },
 
-  // ── 8 ── Maioritariamente perseguidores
+  // ── 8 ── Dois perseguidores
   {
     name: "Nível 8",
     subtitle: "A caçada intensifica-se",
-    hasEnemies: true,
-    chasing: true,
+    enemyCount: 4,
+    hunterRatio: 0.5,
     map: `1111111111111111111
 1P00000000000000001
 10C001100C00000C001
@@ -151,14 +151,14 @@ export const LEVELS: LevelDef[] = [
 1111111111111111111`,
   },
 
-  // ── 9 ── Perseguidores dominam
+  // ── 9 ── Linha de apoio... ocupada (gag: telefone)
   {
     name: "Nível 9",
-    subtitle: "Eles sabem onde estás",
-    hasEnemies: true,
-    chasing: true,
+    subtitle: "Pede ajuda... se conseguires",
+    enemyCount: 4,
+    hunterRatio: 0.5,
     map: `111111111111111111111
-1P0000000000000000001
+1P0000000T00000000001
 10C00110000C000000001
 10000110000000C000001
 10000000000C000000001
@@ -169,18 +169,15 @@ export const LEVELS: LevelDef[] = [
 10001100000C000000001
 10000000000000C000001
 10000000000000C000001
-1111111111111111111 1`.replace(
-      "1111111111111111111 1",
-      "111111111111111111111",
-    ),
+111111111111111111111`,
   },
 
-  // ── 10 ── Fim — perseguidores totais
+  // ── 10 ── O formulário final (gag: sem inimigos, formulário ao passar)
   {
     name: "Nível 10",
-    subtitle: "A sobrevivência final",
-    hasEnemies: true,
-    chasing: true,
+    subtitle: "O fim da jornada... ou será?",
+    enemyCount: 0,
+    hunterRatio: 0,
     map: `11111111111111111111111
 1P000000000000000000001
 10C001100C0000C0000C001
@@ -201,8 +198,7 @@ export const LEVELS: LevelDef[] = [
 export const LEVEL_COUNT = LEVELS.length;
 
 export function getLevelDef(level: number): LevelDef {
-  const idx = Math.max(0, Math.min(level - 1, LEVELS.length - 1));
-  return LEVELS[idx];
+  return LEVELS[Math.max(0, Math.min(level - 1, LEVELS.length - 1))];
 }
 
 export function parseMap(raw: string): ParsedMap {
@@ -211,16 +207,15 @@ export function parseMap(raw: string): ParsedMap {
     .replace(/\r/g, "\n")
     .split("\n")
     .filter((l) => l.length > 0);
+  if (!lines.length) return err("Mapa vazio.");
 
-  if (lines.length === 0) return err("Mapa vazio.");
-
-  const width = lines[0].length;
-  const height = lines.length;
+  const width = lines[0].length,
+    height = lines.length;
 
   if (!lines.every((l) => l.length === width))
     return err("Todas as linhas devem ter o mesmo comprimento.");
 
-  const validChars = new Set([
+  const valid = new Set([
     "0",
     "1",
     "C",
@@ -231,83 +226,86 @@ export function parseMap(raw: string): ParsedMap {
     "l",
     "L",
     "H",
+    "T",
   ]);
   for (const line of lines)
     for (const ch of line)
-      if (!validChars.has(ch)) return err(`Caractere inválido: '${ch}'`);
+      if (!valid.has(ch)) return err(`Caractere inválido: '${ch}'`);
 
   if (
     !lines[0].split("").every((c) => c === "1") ||
     !lines[height - 1].split("").every((c) => c === "1")
   )
     return err("O mapa deve ser fechado por paredes.");
-  for (const line of lines)
-    if (line[0] !== "1" || line[width - 1] !== "1")
+  for (const l of lines)
+    if (l[0] !== "1" || l[width - 1] !== "1")
       return err("O mapa deve ser fechado por paredes.");
 
-  let playerCount = 0,
-    exitCount = 0,
-    collectCount = 0;
-  let playerX = 0,
+  let pCount = 0,
+    eCount = 0,
+    cCount = 0,
+    playerX = 0,
     playerY = 0;
-
-  for (let y = 0; y < height; y++) {
+  for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const c = lines[y][x];
       if (c === CHAR.PLAYER) {
-        playerCount++;
+        pCount++;
         playerX = x;
         playerY = y;
       }
-      if (c === CHAR.EXIT) exitCount++;
-      if (c === CHAR.COLLECT) collectCount++;
+      if (c === CHAR.EXIT) eCount++;
+      if (c === CHAR.COLLECT) cCount++;
     }
-  }
 
-  if (playerCount !== 1)
-    return err("O mapa deve ter exatamente um jogador (P).");
-  if (exitCount < 1) return err("O mapa deve ter uma saída (E).");
-  if (collectCount < 1)
-    return err("O mapa deve ter ao menos um coletável (C).");
+  if (pCount !== 1) return err("O mapa deve ter exatamente um jogador (P).");
+  if (eCount < 1) return err("O mapa deve ter uma saída (E).");
+  if (cCount < 1) return err("O mapa deve ter ao menos um coletável (C).");
 
-  if (!isSolvable(lines, width, height, playerX, playerY, collectCount))
+  if (!isSolvable(lines, width, height, playerX, playerY, cCount, eCount))
     return err("O mapa não pode ser resolvido.");
 
-  return { grid: lines, width, height, playerX, playerY, collectCount };
+  return { grid: lines, width, height, playerX, playerY, collectCount: cCount };
 }
 
 function isSolvable(
   lines: string[],
   w: number,
   h: number,
-  startX: number,
-  startY: number,
-  collectCount: number,
+  sx: number,
+  sy: number,
+  cc: number,
+  ec: number,
 ): boolean {
-  const visited = Array.from({ length: h }, () => new Array(w).fill(false));
-  let toFind = collectCount + 1;
-
-  const stack: [number, number][] = [[startX, startY]];
-  visited[startY][startX] = true;
-
-  while (stack.length > 0) {
+  const vis = Array.from({ length: h }, () => new Array(w).fill(false));
+  let toFind = cc + ec;
+  const stack: [number, number][] = [[sx, sy]];
+  vis[sy][sx] = true;
+  while (stack.length) {
     const [x, y] = stack.pop()!;
     const c = lines[y][x];
-    if (c === CHAR.COLLECT || c === CHAR.EXIT) toFind--;
-    if (toFind === 0) return true;
-
+    if (c === CHAR.COLLECT || c === CHAR.EXIT) {
+      toFind--;
+      if (!toFind) return true;
+    }
     for (const [dx, dy] of [
       [0, -1],
       [0, 1],
       [-1, 0],
       [1, 0],
-    ]) {
+    ] as const) {
       const nx = x + dx,
         ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      if (visited[ny][nx]) continue;
-      if (lines[ny][nx] === CHAR.WALL) continue;
-      visited[ny][nx] = true;
+      if (
+        nx < 0 ||
+        ny < 0 ||
+        nx >= w ||
+        ny >= h ||
+        vis[ny][nx] ||
+        lines[ny][nx] === CHAR.WALL
+      )
+        continue;
+      vis[ny][nx] = true;
       stack.push([nx, ny]);
     }
   }

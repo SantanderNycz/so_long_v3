@@ -6,9 +6,11 @@ import {
   type GameState,
   type Direction,
   type MoveAnim,
+  type GagState,
 } from "./types";
 import type { ParsedMap, LevelDef } from "./map";
 
+// ─── Estado máquina dos inimigos aleatórios ────────────────────────────────
 const ENEMY_NEXT: Record<string, string> = {
   [CHAR.ENEMY_R]: CHAR.ENEMY_r,
   [CHAR.ENEMY_r]: CHAR.ENEMY_l,
@@ -16,11 +18,29 @@ const ENEMY_NEXT: Record<string, string> = {
   [CHAR.ENEMY_L]: CHAR.ENEMY_R,
 };
 
-// ─── Enemy density & hunter ratio per level ───────────────────────────────
-const DENSITY = [0, 0, 0, 0.08, 0.12, 0.15, 0.16, 0.18, 0.2, 0.22, 0.24];
-const HUNT_RATIO = [0, 0, 0, 0, 0, 0, 0.25, 0.45, 0.65, 0.8, 1.0];
-// Probability of random enemy to move erratically (skip state machine)
-const ERRATIC = [0, 0, 0, 0, 0.05, 0.12, 0.2, 0.3, 0.4, 0.5, 0.5];
+const DIR_OF_STATE: Record<string, Direction> = {
+  [CHAR.ENEMY_R]: "down",
+  [CHAR.ENEMY_r]: "left",
+  [CHAR.ENEMY_l]: "up",
+  [CHAR.ENEMY_L]: "right",
+};
+
+// ─── Init ──────────────────────────────────────────────────────────────────
+
+function initGag(level: number, playerX: number, playerY: number): GagState {
+  return {
+    doorTimerMs: -1,
+    doorOpen: false,
+    hiddenRevealed: false,
+    hiddenX: playerX,
+    hiddenY: playerY,
+    fakeDoorCount: level === 7 ? 4 : 0,
+    notification: null,
+    notifTileX: 0,
+    notifTileY: 0,
+    notifTimer: 0,
+  };
+}
 
 export function initGameState(
   parsed: ParsedMap,
@@ -28,25 +48,29 @@ export function initGameState(
   level: number,
   tileSize: number,
 ): GameState {
-  const map = parsed.grid.map((row) => row.split("").slice());
+  const map2d = parsed.grid.map((r) => r.split(""));
 
-  if (def.hasEnemies)
+  if (def.enemyCount > 0)
     placeEnemies(
-      map,
+      map2d,
       parsed.width,
       parsed.height,
-      level,
+      def.enemyCount,
+      def.hunterRatio,
       parsed.playerX,
       parsed.playerY,
     );
 
+  // L5: an extra hidden collectible (not on the map yet)
+  const collectLeft = parsed.collectCount + (level === 5 ? 1 : 0);
+
   return {
-    map: map.map((row) => row.join("")),
+    map: map2d.map((r) => r.join("")),
     width: parsed.width,
     height: parsed.height,
     playerX: parsed.playerX,
     playerY: parsed.playerY,
-    collectLeft: parsed.collectCount,
+    collectLeft,
     moves: 0,
     status: "playing",
     level,
@@ -54,49 +78,41 @@ export function initGameState(
     enemyFrame: 0,
     enemyFrameTimer: 0,
     moveAnim: null,
+    gag: initGag(level, parsed.playerX, parsed.playerY),
   };
 }
+
+// ─── Fixed-count enemy placement ──────────────────────────────────────────
 
 function placeEnemies(
   map: string[][],
   w: number,
   h: number,
-  level: number,
-  playerX: number,
-  playerY: number,
+  count: number,
+  hunterRatio: number,
+  px: number,
+  py: number,
 ): void {
-  const density = DENSITY[level] ?? 0.24;
-  const huntRatio = HUNT_RATIO[level] ?? 1.0;
-
-  for (let y = 1; y < h - 1; y++) {
+  const candidates: [number, number][] = [];
+  for (let y = 1; y < h - 1; y++)
     for (let x = 1; x < w - 1; x++) {
       if (map[y][x] !== CHAR.FLOOR) continue;
-      // Safety radius around player start
-      if (Math.abs(x - playerX) <= 3 && Math.abs(y - playerY) <= 3) continue;
-      if (Math.random() >= density) continue;
-      if (!canPlaceEnemy(map, x, y, w, h)) continue;
-      map[y][x] = Math.random() < huntRatio ? CHAR.HUNTER : CHAR.ENEMY_R;
+      if (Math.abs(x - px) <= 3 && Math.abs(y - py) <= 3) continue; // safe zone
+      candidates.push([x, y]);
     }
+  // Shuffle
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const hunterCount = Math.round(count * hunterRatio);
+  for (let i = 0; i < Math.min(count, candidates.length); i++) {
+    const [x, y] = candidates[i];
+    map[y][x] = i < hunterCount ? CHAR.HUNTER : CHAR.ENEMY_R;
   }
 }
 
-function canPlaceEnemy(
-  map: string[][],
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): boolean {
-  if (x <= 0 || y >= h - 1 || x >= w - 1) return false;
-  return (
-    map[y][x] === CHAR.FLOOR &&
-    map[y][x - 1] === CHAR.FLOOR &&
-    map[y + 1][x] === CHAR.FLOOR &&
-    map[y + 1][x - 1] === CHAR.FLOOR
-  );
-}
-
-// ─── Player movement ───────────────────────────────────────────────────────
+// ─── Player movement + gag intercepts ────────────────────────────────────
 
 export function tryMove(
   state: GameState,
@@ -113,12 +129,24 @@ export function tryMove(
 
   if (ny < 0 || ny >= state.height || nx < 0 || nx >= state.width) return state;
 
-  const map = state.map.slice().map((r) => r.split(""));
+  const map = state.map.map((r) => r.split(""));
   const target = map[ny][nx];
 
   if (target === CHAR.WALL) return state;
   if (isEnemy(target)) return { ...state, status: "dead" };
 
+  // ── Telefone (L9) ────────────────────────────────────────────────────────
+  if (target === CHAR.PHONE) {
+    return notify(state, "Estamos ocupados,\ntente outro dia...", nx, ny, 3500);
+  }
+
+  // ── Intercepts na porta (gags L2, L5, L7, L10) ───────────────────────────
+  if (target === CHAR.EXIT) {
+    const gagResult = handleExitGag(state, map, nx, ny);
+    if (gagResult !== null) return gagResult;
+  }
+
+  // ── Movimento normal ──────────────────────────────────────────────────────
   const moveAnim: MoveAnim = {
     fromX: px,
     fromY: py,
@@ -135,8 +163,10 @@ export function tryMove(
     map[ny][nx] = CHAR.OPEN;
   }
 
-  const newStatus: GameState["status"] =
-    target === CHAR.EXIT && collectLeft === 0 ? "won" : "playing";
+  let newStatus: GameState["status"] = "playing";
+  if (target === CHAR.EXIT && collectLeft === 0) {
+    newStatus = state.level === 10 ? "form" : "won";
+  }
 
   return {
     ...state,
@@ -150,21 +180,72 @@ export function tryMove(
   };
 }
 
-function dirToDelta(dir: Direction): [number, number] {
-  if (dir === "up") return [0, -1];
-  if (dir === "down") return [0, 1];
-  if (dir === "left") return [-1, 0];
-  return [1, 0];
-}
+// ─── Gag: porta ────────────────────────────────────────────────────────────
 
-export function isEnemy(c: string): boolean {
-  return (
-    c === CHAR.ENEMY_R ||
-    c === CHAR.ENEMY_r ||
-    c === CHAR.ENEMY_l ||
-    c === CHAR.ENEMY_L ||
-    c === CHAR.HUNTER
-  );
+function handleExitGag(
+  state: GameState,
+  map: string[][],
+  ex: number,
+  ey: number,
+): GameState | null {
+  const { level, collectLeft, gag } = state;
+
+  // L2 — timer burocrático
+  if (level === 2 && collectLeft === 0) {
+    if (gag.doorOpen) return null; // deixa passar normalmente
+    // Iniciar timer se ainda não iniciado
+    const timerMs = gag.doorTimerMs <= 0 ? 5000 : gag.doorTimerMs;
+    const dias = Math.ceil(timerMs / 1000);
+    return {
+      ...state,
+      gag: {
+        ...gag,
+        doorTimerMs: timerMs,
+        notification: `AIMA Fechada.\nEspere ${dias} dias, por favor`,
+        notifTileX: ex,
+        notifTileY: ey,
+        notifTimer: 2000,
+      },
+    };
+  }
+
+  // L5 — documento em falta
+  if (level === 5 && collectLeft === 1 && !gag.hiddenRevealed) {
+    const newMap = map.map((r) => [...r]);
+    newMap[gag.hiddenY][gag.hiddenX] = CHAR.COLLECT;
+    return {
+      ...state,
+      map: newMap.map((r) => r.join("")),
+      gag: {
+        ...gag,
+        hiddenRevealed: true,
+        notification: "Falta um documento...\nvolte outro dia",
+        notifTileX: ex,
+        notifTileY: ey,
+        notifTimer: 3500,
+      },
+    };
+  }
+
+  // L7 — porta falsa
+  if (level === 7 && gag.fakeDoorCount > 0) {
+    const newMap = map.map((r) => [...r]);
+    newMap[ey][ex] = CHAR.FLOOR; // porta some
+    return {
+      ...state,
+      map: newMap.map((r) => r.join("")),
+      gag: {
+        ...gag,
+        fakeDoorCount: gag.fakeDoorCount - 1,
+        notification: "Dirija-se\npara outra agência",
+        notifTileX: ex,
+        notifTileY: ey,
+        notifTimer: 3000,
+      },
+    };
+  }
+
+  return null; // sem intercept
 }
 
 // ─── Animation tick ────────────────────────────────────────────────────────
@@ -176,39 +257,60 @@ export function tickAnimations(
 ): GameState {
   if (state.status === "idle") return state;
 
-  let next = { ...state };
+  let s = { ...state, gag: { ...state.gag } };
 
-  // Enemy frame
-  next.enemyFrameTimer += dt;
-  if (next.enemyFrameTimer >= ENEMY_CYCLE / 7) {
-    next.enemyFrameTimer = 0;
-    next.enemyFrame = (next.enemyFrame + 1) % 7;
+  // Quadros do inimigo
+  s.enemyFrameTimer += dt;
+  if (s.enemyFrameTimer >= ENEMY_CYCLE / 7) {
+    s.enemyFrameTimer = 0;
+    s.enemyFrame = (s.enemyFrame + 1) % 7;
   }
 
-  // Move enemies every cycle
+  // Mover inimigos
   if (
-    next.status === "playing" &&
+    s.status === "playing" &&
     Math.floor(now / ENEMY_CYCLE) > Math.floor((now - dt) / ENEMY_CYCLE)
   ) {
-    next = moveEnemies(next);
+    s = moveEnemies(s);
   }
 
-  // Clear move anim
-  if (next.moveAnim && now - next.moveAnim.startTime > MOVE_DURATION) {
-    next.moveAnim = null;
+  // Limpar anim de movimento
+  if (s.moveAnim && now - s.moveAnim.startTime > MOVE_DURATION)
+    s.moveAnim = null;
+
+  // Timer da notificação
+  if (s.gag.notifTimer > 0) {
+    s.gag.notifTimer = Math.max(0, s.gag.notifTimer - dt);
+    if (s.gag.notifTimer === 0) s.gag.notification = null;
   }
 
-  return next;
+  // Timer da porta L2
+  if (s.gag.doorTimerMs > 0) {
+    s.gag.doorTimerMs = Math.max(0, s.gag.doorTimerMs - dt);
+    const dias = Math.ceil(s.gag.doorTimerMs / 1000);
+    // Atualizar texto do balão enquanto corre
+    if (s.gag.doorTimerMs > 0) {
+      s.gag.notification = `AIMA Fechada.\nEspere ${dias} dia${dias === 1 ? "" : "s"}, por favor`;
+      s.gag.notifTimer = 2000; // keep visible
+    } else {
+      // Timer chegou a 0 — porta abre
+      s.gag.doorOpen = true;
+      s.gag.notification = "✅ AIMA aberta!\nPode entrar.";
+      s.gag.notifTileX = s.gag.notifTileX; // keep position
+      s.gag.notifTimer = 2500;
+    }
+  }
+
+  return s;
 }
 
+// ─── Mover inimigos ────────────────────────────────────────────────────────
+
 function moveEnemies(state: GameState): GameState {
-  const map = state.map.slice().map((r) => r.split(""));
+  const map = state.map.map((r) => r.split(""));
   let status = state.status;
 
-  const erratic = ERRATIC[state.level] ?? 0.5;
-
-  // Collect enemies first so we don't double-move
-  const enemies: Array<[number, number, string]> = [];
+  const enemies: [number, number, string][] = [];
   for (let y = 0; y < state.height; y++)
     for (let x = 0; x < state.width; x++)
       if (isEnemy(map[y][x])) enemies.push([x, y, map[y][x]]);
@@ -216,7 +318,7 @@ function moveEnemies(state: GameState): GameState {
   for (const [ex, ey, es] of enemies) {
     if (status === "dead") break;
 
-    // ── Hunter: BFS toward player ──────────────────────────────────────────
+    // ── Hunter: BFS ──────────────────────────────────────────────────────
     if (es === CHAR.HUNTER) {
       const step = bfsStep(
         map,
@@ -229,6 +331,12 @@ function moveEnemies(state: GameState): GameState {
       );
       if (!step) continue;
       const [nx, ny] = step;
+      if (
+        map[ny][nx] !== CHAR.FLOOR &&
+        map[ny][nx] !== CHAR.OPEN &&
+        !(nx === state.playerX && ny === state.playerY)
+      )
+        continue;
       if (nx === state.playerX && ny === state.playerY) {
         status = "dead";
         continue;
@@ -238,46 +346,20 @@ function moveEnemies(state: GameState): GameState {
       continue;
     }
 
-    // ── Random enemy: state machine (60% move chance) ─────────────────────
+    // ── Random: máquina de estados (60% chance de mover) ─────────────────
     if (Math.random() >= 0.6) continue;
-
-    let dirName: string;
-    if (Math.random() < erratic) {
-      // Pick a random free adjacent cell
-      const dirs = ["up", "down", "left", "right"];
-      const shuffled = dirs.sort(() => Math.random() - 0.5);
-      const picked = shuffled.find((d) => {
-        const [ddx, ddy] = dirToDelta(d as Direction);
-        const nx = ex + ddx,
-          ny = ey + ddy;
-        return (
-          ny >= 0 &&
-          ny < state.height &&
-          nx >= 0 &&
-          nx < state.width &&
-          map[ny][nx] !== CHAR.WALL &&
-          !isEnemy(map[ny][nx])
-        );
-      });
-      if (!picked) continue;
-      dirName = picked;
-    } else {
-      dirName = stateToDir(es);
-    }
-
-    const [ddx, ddy] = dirToDelta(dirName as Direction);
+    const dir = DIR_OF_STATE[es];
+    if (!dir) continue;
+    const [ddx, ddy] = dirToDelta(dir);
     const nx = ex + ddx,
       ny = ey + ddy;
-
     if (ny < 0 || ny >= state.height || nx < 0 || nx >= state.width) continue;
     const tile = map[ny][nx];
     if (tile === CHAR.WALL || isEnemy(tile)) continue;
-
     if (nx === state.playerX && ny === state.playerY) {
       status = "dead";
       continue;
     }
-
     map[ey][ex] = CHAR.FLOOR;
     map[ny][nx] = ENEMY_NEXT[es] ?? CHAR.ENEMY_R;
   }
@@ -285,14 +367,7 @@ function moveEnemies(state: GameState): GameState {
   return { ...state, map: map.map((r) => r.join("")), status };
 }
 
-function stateToDir(es: string): string {
-  if (es === CHAR.ENEMY_R) return "down";
-  if (es === CHAR.ENEMY_r) return "left";
-  if (es === CHAR.ENEMY_l) return "up";
-  return "right"; // ENEMY_L
-}
-
-// ─── BFS: returns first step [nx, ny] from (fx,fy) toward (tx,ty) ─────────
+// ─── BFS: primeiro passo do caminho de (fx,fy) até (tx,ty) ───────────────
 
 function bfsStep(
   map: string[][],
@@ -304,21 +379,18 @@ function bfsStep(
   ty: number,
 ): [number, number] | null {
   if (fx === tx && fy === ty) return null;
-
-  const visited = Array.from({ length: h }, () => new Uint8Array(w));
-  // prev[ny][nx] = [px, py] of the cell we came from
-  const prev: ([number, number] | null)[][] = Array.from({ length: h }, () =>
+  type Prev = [number, number] | null;
+  const vis = Array.from({ length: h }, () => new Uint8Array(w));
+  const prev: Prev[][] = Array.from({ length: h }, () =>
     new Array(w).fill(null),
   );
+  const q: [number, number][] = [[fx, fy]];
+  vis[fy][fx] = 1;
 
-  const queue: [number, number][] = [[fx, fy]];
-  visited[fy][fx] = 1;
-
-  while (queue.length > 0) {
-    const [x, y] = queue.shift()!;
-
+  while (q.length) {
+    const [x, y] = q.shift()!;
     if (x === tx && y === ty) {
-      // Trace back to find the first step
+      // Voltar até encontrar o passo a partir de (fx,fy)
       let cx = tx,
         cy = ty;
       while (true) {
@@ -331,43 +403,66 @@ function bfsStep(
       }
       return null;
     }
-
     for (const [dx, dy] of [
       [0, -1],
       [0, 1],
       [-1, 0],
       [1, 0],
-    ]) {
+    ] as const) {
       const nx = x + dx,
         ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      if (visited[ny][nx]) continue;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h || vis[ny][nx]) continue;
       const t = map[ny][nx];
-      // Hunters can walk through other hunters to reach player,
-      // but NOT through walls or random enemies
-      if (t === CHAR.WALL) continue;
-      if (
-        t === CHAR.ENEMY_R ||
-        t === CHAR.ENEMY_r ||
-        t === CHAR.ENEMY_l ||
-        t === CHAR.ENEMY_L
-      )
-        continue;
-      visited[ny][nx] = 1;
+      if (t === CHAR.WALL || isEnemy(t)) continue;
+      vis[ny][nx] = 1;
       prev[ny][nx] = [x, y];
-      queue.push([nx, ny]);
+      q.push([nx, ny]);
     }
   }
   return null;
 }
 
-// ─── Enemy animation ───────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
-export function enemyFrameToSprite(frame: number): number {
-  return [0, 1, 2, 3, 2, 1, 0][frame % 7] ?? 0;
+export function isEnemy(c: string): boolean {
+  return (
+    c === CHAR.ENEMY_R ||
+    c === CHAR.ENEMY_r ||
+    c === CHAR.ENEMY_l ||
+    c === CHAR.ENEMY_L ||
+    c === CHAR.HUNTER
+  );
 }
 
-// ─── Wall variant ──────────────────────────────────────────────────────────
+function dirToDelta(dir: Direction): [number, number] {
+  if (dir === "up") return [0, -1];
+  if (dir === "down") return [0, 1];
+  if (dir === "left") return [-1, 0];
+  return [1, 0];
+}
+
+function notify(
+  state: GameState,
+  msg: string,
+  tx: number,
+  ty: number,
+  ms: number,
+): GameState {
+  return {
+    ...state,
+    gag: {
+      ...state.gag,
+      notification: msg,
+      notifTileX: tx,
+      notifTileY: ty,
+      notifTimer: ms,
+    },
+  };
+}
+
+export function enemyFrameToSprite(frame: number): number {
+  return ([0, 1, 2, 3, 2, 1, 0] as const)[frame % 7] ?? 0;
+}
 
 export function getWallVariant(
   x: number,
@@ -375,27 +470,23 @@ export function getWallVariant(
   w: number,
   h: number,
 ): string {
-  const top = y === 0,
-    bottom = y === h - 1;
-  const left = x === 0,
-    right = x === w - 1;
-  if (top && left) return "tl";
-  if (top && right) return "tr";
-  if (bottom && left) return "bl";
-  if (bottom && right) return "br";
-  if (top) return "t";
-  if (bottom) return "b";
-  if (left) return "l";
-  if (right) return "r";
+  const t = y === 0,
+    b = y === h - 1,
+    l = x === 0,
+    r = x === w - 1;
+  if (t && l) return "tl";
+  if (t && r) return "tr";
+  if (b && l) return "bl";
+  if (b && r) return "br";
+  if (t) return "t";
+  if (b) return "b";
+  if (l) return "l";
+  if (r) return "r";
   return "center";
 }
 
-// ─── Tile size: fit map into visible viewport ──────────────────────────────
-
 export function computeTileSize(mapW: number, mapH: number): number {
-  const UI_CHROME = 160; // px reserved for controls above/below canvas
-  const PADDING = 32;
-  const maxW = Math.floor((window.innerWidth - PADDING) / mapW);
-  const maxH = Math.floor((window.innerHeight - UI_CHROME) / mapH);
-  return Math.max(16, Math.min(maxW, maxH, TILE)); // clamp 16..96
+  const maxW = Math.floor((window.innerWidth - 32) / mapW);
+  const maxH = Math.floor((window.innerHeight - 280) / mapH);
+  return Math.max(16, Math.min(maxW, maxH, TILE));
 }

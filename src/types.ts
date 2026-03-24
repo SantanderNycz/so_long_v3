@@ -1,10 +1,9 @@
 export const TILE = 96;
-export const ANIM_FRAMES = 4;
-export const ENEMY_CYCLE = 420;
 export const MOVE_DURATION = 120;
+export const ENEMY_CYCLE = 550; // ms — ligeiramente mais lento = mais jogável
 
 export type Direction = "up" | "down" | "left" | "right";
-export type GameStatus = "playing" | "won" | "dead" | "idle";
+export type GameStatus = "playing" | "won" | "dead" | "idle" | "form";
 
 export const CHAR = {
   FLOOR: "0",
@@ -18,7 +17,25 @@ export const CHAR = {
   ENEMY_L: "L",
   HUNTER: "H",
   OPEN: "O",
+  PHONE: "T",
 } as const;
+
+export interface GagState {
+  // L2 — porta com timer
+  doorTimerMs: number; // -1=não iniciado, >0=contando, 0=aberta
+  doorOpen: boolean;
+  // L5 — colecionável escondido
+  hiddenRevealed: boolean;
+  hiddenX: number;
+  hiddenY: number;
+  // L7 — portas falsas (começa em 4)
+  fakeDoorCount: number;
+  // Balão de notificação
+  notification: string | null;
+  notifTileX: number;
+  notifTileY: number;
+  notifTimer: number; // ms visível
+}
 
 export interface GameState {
   map: string[];
@@ -34,6 +51,7 @@ export interface GameState {
   enemyFrame: number;
   enemyFrameTimer: number;
   moveAnim: MoveAnim | null;
+  gag: GagState;
 }
 
 export interface MoveAnim {

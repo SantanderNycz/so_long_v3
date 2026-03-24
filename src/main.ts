@@ -10,8 +10,6 @@ import { render } from "./renderer";
 import { type GameState, type Direction, type Assets } from "./types";
 import "./style.css";
 
-// ─── State ──────────────────────────────────────────────────────────────────
-
 let state: GameState | null = null;
 let assets: Assets | null = null;
 let canvas: HTMLCanvasElement;
@@ -19,21 +17,21 @@ let ctx: CanvasRenderingContext2D;
 let lastTime = 0;
 let currentLevel = 1;
 
-// ─── Game loop ────────────────────────────────────────────────────────────
+// ─── Game loop ───────────────────────────────────────────────────────────
 
 function loop(now: number): void {
-  const dt = Math.min(now - lastTime, 100); // cap dt to avoid spiral on tab switch
+  const dt = Math.min(now - lastTime, 100);
   lastTime = now;
-
   if (state && assets) {
     state = tickAnimations(state, now, dt);
+    // Mostrar overlay do formulário se necessário
+    if (state.status === "form") showForm();
     render(ctx, state, assets, now);
   }
-
   requestAnimationFrame(loop);
 }
 
-// ─── Input ───────────────────────────────────────────────────────────────
+// ─── Input ────────────────────────────────────────────────────────────────
 
 const KEY_MAP: Record<string, Direction> = {
   KeyW: "up",
@@ -48,19 +46,13 @@ const KEY_MAP: Record<string, Direction> = {
 
 window.addEventListener("keydown", (e) => {
   if (!state) return;
-
-  if (e.code === "Enter" || e.code === "Space") {
+  if (e.code === "Enter") {
     e.preventDefault();
-    if (state.status === "won") {
-      advanceLevel();
-    } else if (state.status === "dead") {
-      loadLevel(currentLevel);
-    }
+    if (state.status === "won") advanceLevel();
+    else if (state.status === "dead") loadLevel(currentLevel);
     return;
   }
-
   if (state.status !== "playing") return;
-
   const dir = KEY_MAP[e.code];
   if (!dir) return;
   e.preventDefault();
@@ -79,15 +71,14 @@ function bindBtn(id: string, dir: Direction): void {
   btn.addEventListener("touchstart", fire, { passive: false });
 }
 
-// ─── Level management ─────────────────────────────────────────────────────
+// ─── Levels ───────────────────────────────────────────────────────────────
 
 function loadLevel(level: number): void {
   currentLevel = Math.max(1, Math.min(level, LEVEL_COUNT));
   const def = getLevelDef(currentLevel);
   const parsed = parseMap(def.map);
-
   if (parsed.error) {
-    console.error(`Level ${currentLevel} error:`, parsed.error);
+    console.error(parsed.error);
     return;
   }
 
@@ -96,7 +87,8 @@ function loadLevel(level: number): void {
   canvas.height = parsed.height * ts;
 
   state = initGameState(parsed, def, currentLevel, ts);
-  updateLevelBanner(def.name, def.subtitle);
+  updateBanner(def.name, def.subtitle);
+  hideForm();
 }
 
 function advanceLevel(): void {
@@ -107,23 +99,14 @@ function advanceLevel(): void {
   loadLevel(currentLevel + 1);
 }
 
-function updateLevelBanner(name: string, subtitle: string): void {
+function updateBanner(name: string, sub: string): void {
   const el = document.getElementById("level-banner");
   if (!el) return;
-  el.innerHTML = `<span class="lv-name">${name}</span><span class="lv-sub">${subtitle}</span>`;
-
-  // Flash animation
+  el.innerHTML = `<span class="lv-name">${name}</span><span class="lv-sub">${sub}</span>`;
   el.classList.remove("flash");
-  void el.offsetWidth; // reflow
+  void el.offsetWidth;
   el.classList.add("flash");
 }
-
-function showEndScreen(): void {
-  const overlay = document.getElementById("end-overlay");
-  if (overlay) overlay.style.display = "flex";
-}
-
-// ─── Window resize ─────────────────────────────────────────────────────────
 
 function onResize(): void {
   if (!state) return;
@@ -133,7 +116,32 @@ function onResize(): void {
   state = { ...state, tileSize: ts };
 }
 
-// ─── Bootstrap ───────────────────────────────────────────────────────────
+// ─── Formulário L10 ───────────────────────────────────────────────────────
+
+function showForm(): void {
+  const el = document.getElementById("form-overlay");
+  if (el && el.style.display !== "flex") el.style.display = "flex";
+}
+
+function hideForm(): void {
+  const el = document.getElementById("form-overlay");
+  if (el) el.style.display = "none";
+  const msg = document.getElementById("form-result");
+  if (msg) msg.style.display = "none";
+  const form = document.getElementById(
+    "bureaucracy-form",
+  ) as HTMLFormElement | null;
+  if (form) form.style.display = "flex";
+}
+
+// ─── End screen ───────────────────────────────────────────────────────────
+
+function showEndScreen(): void {
+  const el = document.getElementById("end-overlay");
+  if (el) el.style.display = "flex";
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
   canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -152,25 +160,37 @@ async function init(): Promise<void> {
   loading.style.display = "none";
   ui.style.display = "flex";
 
-  // D-pad
   bindBtn("btn-up", "up");
   bindBtn("btn-down", "down");
   bindBtn("btn-left", "left");
   bindBtn("btn-right", "right");
 
-  // Restart current level
   document
     .getElementById("restart")!
     .addEventListener("click", () => loadLevel(currentLevel));
 
-  // End screen restart
-  const endBtn = document.getElementById("end-restart");
-  if (endBtn)
-    endBtn.addEventListener("click", () => {
-      const ov = document.getElementById("end-overlay");
-      if (ov) ov.style.display = "none";
+  // End screen
+  document.getElementById("end-restart")?.addEventListener("click", () => {
+    const ov = document.getElementById("end-overlay");
+    if (ov) ov.style.display = "none";
+    loadLevel(1);
+  });
+
+  // Formulário L10 — enviar
+  const form = document.getElementById(
+    "bureaucracy-form",
+  ) as HTMLFormElement | null;
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    form.style.display = "none";
+    const res = document.getElementById("form-result");
+    if (res) res.style.display = "flex";
+    // Após 4s, reinicia do nível 1
+    setTimeout(() => {
+      hideForm();
       loadLevel(1);
-    });
+    }, 4500);
+  });
 
   window.addEventListener("resize", onResize);
 

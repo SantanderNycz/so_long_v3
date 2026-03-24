@@ -12,7 +12,7 @@ export function render(
 
   const { width: W, height: H, map, playerX, playerY, moveAnim } = state;
 
-  // Interpolated player position
+  // Player interpolado
   let drawPX = playerX,
     drawPY = playerY;
   if (moveAnim) {
@@ -22,16 +22,16 @@ export function render(
     drawPY = moveAnim.fromY + (moveAnim.toY - moveAnim.fromY) * ease;
   }
 
-  const enemySprite = enemyFrameToSprite(state.enemyFrame);
+  const eSprite = enemyFrameToSprite(state.enemyFrame);
 
-  // Draw tiles
+  // Tiles
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const c = map[y][x];
       const px = x * ts,
         py = y * ts;
 
-      ctx.drawImage(assets.bg, px, py, ts, ts);
+      ctx.drawImage(assets.bg, px, py, ts, ts); // chão sempre primeiro
 
       if (c === CHAR.WALL) {
         const v = getWallVariant(x, y, W, H);
@@ -48,10 +48,11 @@ export function render(
         ctx.drawImage(assets.chest_o, px, py, ts, ts);
       } else if (c === CHAR.EXIT) {
         ctx.drawImage(assets.exit, px, py, ts, ts);
+      } else if (c === CHAR.PHONE) {
+        drawPhone(ctx, px, py, ts);
       } else if (c === CHAR.HUNTER) {
-        // Hunters: draw enemy with a red tint
-        ctx.drawImage(assets.enemy[enemySprite], px, py, ts, ts);
-        ctx.fillStyle = "rgba(255,60,60,0.35)";
+        ctx.drawImage(assets.enemy[eSprite], px, py, ts, ts);
+        ctx.fillStyle = "rgba(255,50,50,0.30)";
         ctx.fillRect(px, py, ts, ts);
       } else if (
         c === CHAR.ENEMY_R ||
@@ -59,7 +60,7 @@ export function render(
         c === CHAR.ENEMY_l ||
         c === CHAR.ENEMY_L
       ) {
-        ctx.drawImage(assets.enemy[enemySprite], px, py, ts, ts);
+        ctx.drawImage(assets.enemy[eSprite], px, py, ts, ts);
       }
     }
   }
@@ -70,7 +71,34 @@ export function render(
   // HUD
   drawHUD(ctx, state, ts);
 
-  // Overlays
+  // Balão de notificação
+  const { gag } = state;
+  if (gag.notification && gag.notifTimer > 0) {
+    drawBalloon(
+      ctx,
+      gag.notification,
+      gag.notifTileX,
+      gag.notifTileY,
+      ts,
+      W,
+      H,
+    );
+  }
+  // L2: balão permanente enquanto timer roda
+  if (state.level === 2 && gag.doorTimerMs > 0 && !gag.notification) {
+    const dias = Math.ceil(gag.doorTimerMs / 1000);
+    drawBalloon(
+      ctx,
+      `AIMA Fechada.\nEspere ${dias} dia${dias === 1 ? "" : "s"}, por favor`,
+      gag.notifTileX,
+      gag.notifTileY,
+      ts,
+      W,
+      H,
+    );
+  }
+
+  // Overlays de fim
   if (state.status === "won")
     drawOverlay(
       ctx,
@@ -87,32 +115,119 @@ export function render(
     );
 }
 
+// ─── Telefone ───────────────────────────────────────────────────────────────
+
+function drawPhone(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  ts: number,
+): void {
+  // Fundo azul claro
+  ctx.fillStyle = "#1e3a5f";
+  ctx.fillRect(px + ts * 0.1, py + ts * 0.1, ts * 0.8, ts * 0.8);
+  // Emoji
+  ctx.font = `${ts * 0.55}px serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("📞", px + ts * 0.5, py + ts * 0.52);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+}
+
+// ─── Balão de fala ──────────────────────────────────────────────────────────
+
+function drawBalloon(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  tx: number,
+  ty: number,
+  ts: number,
+  _mapW: number,
+  _mapH: number,
+): void {
+  const lines = text.split("\n");
+  const fs = Math.max(10, Math.min(15, ts * 0.17));
+  ctx.font = `bold ${fs}px monospace`;
+
+  const pad = 8;
+  const lineH = fs * 1.4;
+  const boxW =
+    Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2;
+  const boxH = lines.length * lineH + pad;
+
+  // Posição: acima do tile, centrado, mas clamped ao canvas
+  let bx = tx * ts + ts / 2 - boxW / 2;
+  let by = ty * ts - boxH - ts * 0.3;
+
+  // Clamp
+  const cW = ctx.canvas.width;
+  bx = Math.max(4, Math.min(bx, cW - boxW - 4));
+  if (by < 4) by = ty * ts + ts + 4; // abaixo se não couber acima
+
+  // Sombra
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 6;
+
+  // Caixa
+  ctx.fillStyle = "#fefae0";
+  ctx.strokeStyle = "#a08c50";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, boxW, boxH, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+
+  // Triângulo apontado para o tile
+  const arrowX = Math.max(bx + 12, Math.min(tx * ts + ts / 2, bx + boxW - 12));
+  const arrowY = by + boxH;
+  ctx.fillStyle = "#fefae0";
+  ctx.strokeStyle = "#a08c50";
+  ctx.beginPath();
+  ctx.moveTo(arrowX - 6, arrowY);
+  ctx.lineTo(arrowX + 6, arrowY);
+  ctx.lineTo(arrowX, arrowY + 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Texto
+  ctx.fillStyle = "#2d1f00";
+  ctx.textBaseline = "top";
+  lines.forEach((l, i) => {
+    ctx.fillText(l, bx + pad, by + pad / 2 + i * lineH);
+  });
+  ctx.textBaseline = "alphabetic";
+}
+
+// ─── HUD ────────────────────────────────────────────────────────────────────
+
 function drawHUD(
   ctx: CanvasRenderingContext2D,
   state: GameState,
   ts: number,
 ): void {
   const pad = 8;
+  const fs = Math.max(11, Math.round(ts * 0.17));
   const left = `Movimentos: ${state.moves}   Coletáveis: ${state.collectLeft}`;
   const right = `${state.level}/10`;
 
   ctx.save();
-  ctx.font = `bold ${Math.max(11, Math.round(ts * 0.17))}px monospace`;
-
-  // Left badge
-  const lm = ctx.measureText(left);
+  ctx.font = `bold ${fs}px monospace`;
   const bh = Math.max(22, Math.round(ts * 0.26));
-  drawBadge(ctx, pad, pad, lm.width + pad * 2, bh, "rgba(0,0,0,0.55)");
-  ctx.fillStyle = "#ffffff";
+
+  const lw = ctx.measureText(left).width + pad * 2;
+  drawBadge(ctx, pad, pad, lw, bh, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = "#fff";
   ctx.fillText(left, pad * 2, pad + bh * 0.68);
 
-  // Right level badge
-  const rm = ctx.measureText(right);
-  const rx = ctx.canvas.width - rm.width - pad * 3;
-  drawBadge(ctx, rx, pad, rm.width + pad * 2, bh, "rgba(203,166,247,0.3)");
+  const rw = ctx.measureText(right).width + pad * 2;
+  const rx = ctx.canvas.width - rw - pad;
+  drawBadge(ctx, rx, pad, rw, bh, "rgba(203,166,247,0.3)");
   ctx.fillStyle = "#e9d8fd";
   ctx.fillText(right, rx + pad, pad + bh * 0.68);
-
   ctx.restore();
 }
 
@@ -130,6 +245,8 @@ function drawBadge(
   ctx.fill();
 }
 
+// ─── Overlay win/dead ────────────────────────────────────────────────────────
+
 function drawOverlay(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -141,7 +258,7 @@ function drawOverlay(
   ctx.fillStyle = "rgba(0,0,0,0.62)";
   ctx.fillRect(0, 0, width, height);
 
-  const fs = Math.max(16, Math.min(28, Math.round(width / 18)));
+  const fs = Math.max(14, Math.min(26, Math.round(width / 20)));
   ctx.font = `bold ${fs}px monospace`;
   const tm = ctx.measureText(text);
   const cw = tm.width + 48,
@@ -158,12 +275,10 @@ function drawOverlay(
   ctx.textBaseline = "middle";
   ctx.fillText(text, cx + 24, cy + ch / 2);
 
-  // Hint text below
-  ctx.font = `${Math.round(fs * 0.65)}px monospace`;
+  ctx.font = `${Math.round(fs * 0.62)}px monospace`;
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.textBaseline = "top";
   const hm = ctx.measureText(hint);
   ctx.fillText(hint, (width - hm.width) / 2, cy + ch + 10);
-
   ctx.restore();
 }

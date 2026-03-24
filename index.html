@@ -10,32 +10,24 @@
 
 <body>
   <h1>🗝 So Long</h1>
-
   <p id="loading">A carregar assets…</p>
 
   <div id="ui">
 
-    <!-- Level banner -->
     <div id="level-banner">
       <span class="lv-name">Nível 1</span>
       <span class="lv-sub">Aprende a mover-te</span>
     </div>
 
-    <!-- Restart -->
     <div class="controls">
       <button id="restart">↺ Reiniciar nível</button>
       <span class="hints">
-        Mover: <kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd> &nbsp;·&nbsp;
-        Avançar / Reiniciar: <kbd>Enter</kbd>
+        <kbd>W A S D</kbd> / <kbd>↑ ↓ ← →</kbd> &nbsp;·&nbsp; <kbd>Enter</kbd> avança/reinicia
       </span>
     </div>
 
-    <!-- Canvas -->
-    <div id="canvas-wrap">
-      <canvas id="game"></canvas>
-    </div>
+    <div id="canvas-wrap"><canvas id="game"></canvas></div>
 
-    <!-- D-pad -->
     <div id="dpad">
       <button id="btn-up">▲</button>
       <button id="btn-left">◀</button>
@@ -45,7 +37,50 @@
 
   </div>
 
-  <!-- End screen overlay -->
+  <!-- ── Formulário L10 ─────────────────────────────────────────────── -->
+  <div id="form-overlay">
+    <div class="form-card">
+      <div class="form-header">
+        <span class="form-emoji">📋</span>
+        <h2>Formulário de Conclusão</h2>
+        <p class="form-subtitle">Por favor, preencha todos os campos obrigatórios</p>
+      </div>
+
+      <form id="bureaucracy-form">
+        <label>Nome completo (como consta no RG de 1987) *
+          <input type="text" placeholder="Nome completo" required />
+        </label>
+        <label>CPF com pontuação e alma *
+          <input type="text" placeholder="000.000.000-00" required />
+        </label>
+        <label>Número do processo anterior (deixado em branco) *
+          <input type="text" placeholder="Obrigatório" required />
+        </label>
+        <label>Motivo da visita (máx. 3 palavras, mín. 500 caracteres) *
+          <textarea placeholder="Descreva detalhadamente..." required></textarea>
+        </label>
+        <label>Horário preferencial de atendimento *
+          <select required>
+            <option value="">Selecione...</option>
+            <option>Segunda, 08h01 (única vaga disponível)</option>
+            <option>Terça, 08h02</option>
+            <option>Quinta, ano que vem</option>
+          </select>
+        </label>
+        <button type="submit" class="submit-btn">📤 Enviar Formulário</button>
+      </form>
+
+      <div id="form-result">
+        <div class="result-emoji">💾</div>
+        <h3>Formulário enviado com sucesso!</h3>
+        <p>Desculpe, nosso banco de dados foi apagado sem querer...</p>
+        <p class="result-sub">Volte ao início e reagende novamente 😊</p>
+        <p class="result-loading">A reiniciar…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fim de jogo ─────────────────────────────────────────────────── -->
   <div id="end-overlay">
     <div class="end-card">
       <div class="end-trophy">🏆</div>

@@ -13,8 +13,6 @@
   --text: #cdd6f4;
   --muted: #6c7086;
   --accent: #cba6f7;
-  --green: #a6e3a1;
-  --red: #f38ba8;
 }
 
 html,
@@ -26,13 +24,12 @@ body {
   font-family: "Segoe UI", system-ui, sans-serif;
   overflow-x: hidden;
 }
-
 body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 16px;
-  gap: 10px;
+  padding: 10px 16px;
+  gap: 8px;
 }
 
 h1 {
@@ -41,22 +38,20 @@ h1 {
   color: var(--accent);
   text-transform: uppercase;
 }
-
 #loading {
   color: var(--muted);
   margin-top: 40px;
 }
 
-/* ── Main layout ── */
 #ui {
   display: none;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 
-/* ── Level banner ── */
+/* ── Banner ── */
 #level-banner {
   display: flex;
   align-items: baseline;
@@ -64,7 +59,7 @@ h1 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 6px 16px;
+  padding: 5px 14px;
 }
 #level-banner.flash {
   animation: flash 0.4s ease;
@@ -80,14 +75,14 @@ h1 {
 .lv-name {
   font-weight: 700;
   color: var(--accent);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 .lv-sub {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
 }
 
-/* ── Controls ── */
+/* ── Botões ── */
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -95,14 +90,13 @@ h1 {
   align-items: center;
   justify-content: center;
 }
-
 button {
   background: var(--surface);
   color: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 6px;
   font-size: 0.85rem;
-  padding: 6px 12px;
+  padding: 5px 11px;
   cursor: pointer;
   font-weight: 600;
   transition:
@@ -113,17 +107,16 @@ button:hover {
   background: var(--accent);
   color: #1a1a2e;
 }
-
 .hints {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--muted);
 }
 .hints kbd {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.68rem;
+  padding: 1px 4px;
+  font-size: 0.66rem;
   color: var(--text);
 }
 
@@ -135,9 +128,7 @@ button:hover {
   line-height: 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   max-width: 100%;
-  max-height: calc(100vh - 160px);
 }
-
 canvas {
   display: block;
   image-rendering: pixelated;
@@ -179,7 +170,132 @@ canvas {
   grid-row: 3;
 }
 
-/* ── End screen ── */
+/* ── Formulário L10 ── */
+#form-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 32px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-header {
+  text-align: center;
+}
+.form-emoji {
+  font-size: 2.5rem;
+}
+.form-header h2 {
+  color: var(--accent);
+  font-size: 1.3rem;
+  margin-top: 6px;
+}
+.form-subtitle {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+#bureaucracy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+#bureaucracy-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+#bureaucracy-form input,
+#bureaucracy-form textarea,
+#bureaucracy-form select {
+  background: #13131f;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+#bureaucracy-form textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+#bureaucracy-form input:focus,
+#bureaucracy-form textarea:focus,
+#bureaucracy-form select:focus {
+  outline: 2px solid var(--accent);
+}
+
+.submit-btn {
+  margin-top: 4px;
+  background: var(--accent) !important;
+  color: #1a1a2e !important;
+  border-color: var(--accent) !important;
+  font-size: 0.9rem !important;
+  padding: 9px !important;
+}
+.submit-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* Resultado do formulário */
+#form-result {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 12px 0;
+}
+.result-emoji {
+  font-size: 2.8rem;
+}
+#form-result h3 {
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+#form-result p {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.result-sub {
+  color: #f38ba8 !important;
+}
+.result-loading {
+  color: var(--muted) !important;
+  font-size: 0.75rem !important;
+  animation: pulse 1s ease infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ── Ecrã final ── */
 #end-overlay {
   display: none;
   position: fixed;
@@ -205,7 +321,7 @@ canvas {
 }
 .end-card h2 {
   color: var(--accent);
-  font-size: 1.6rem;
+  font-size: 1.5rem;
 }
 .end-card p {
   color: var(--muted);
