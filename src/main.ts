@@ -189,7 +189,7 @@ async function init(): Promise<void> {
     setTimeout(() => {
       hideForm();
       loadLevel(1);
-    }, 4500);
+    }, 15000);
   });
 
   window.addEventListener("resize", onResize);
