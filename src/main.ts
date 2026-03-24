@@ -1,169 +1,182 @@
-import { CHAR, MOVE_DURATION, type GameState, type Assets } from "./types";
-import { enemyFrameToSprite, getWallVariant } from "./game";
+import { loadAssets } from "./assets";
+import { parseMap, getLevelDef, LEVEL_COUNT } from "./map";
+import {
+  initGameState,
+  tryMove,
+  tickAnimations,
+  computeTileSize,
+} from "./game";
+import { render } from "./renderer";
+import { type GameState, type Direction, type Assets } from "./types";
+import "./style.css";
 
-export function render(
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  assets: Assets,
-  now: number,
-): void {
-  const ts = state.tileSize;
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+// ─── State ──────────────────────────────────────────────────────────────────
 
-  const { width: W, height: H, map, playerX, playerY, moveAnim } = state;
+let state: GameState | null = null;
+let assets: Assets | null = null;
+let canvas: HTMLCanvasElement;
+let ctx: CanvasRenderingContext2D;
+let lastTime = 0;
+let currentLevel = 1;
 
-  // Interpolated player position
-  let drawPX = playerX,
-    drawPY = playerY;
-  if (moveAnim) {
-    const t = Math.min(1, (now - moveAnim.startTime) / MOVE_DURATION);
-    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-    drawPX = moveAnim.fromX + (moveAnim.toX - moveAnim.fromX) * ease;
-    drawPY = moveAnim.fromY + (moveAnim.toY - moveAnim.fromY) * ease;
+// ─── Game loop ────────────────────────────────────────────────────────────
+
+function loop(now: number): void {
+  const dt = Math.min(now - lastTime, 100); // cap dt to avoid spiral on tab switch
+  lastTime = now;
+
+  if (state && assets) {
+    state = tickAnimations(state, now, dt);
+    render(ctx, state, assets, now);
   }
 
-  const enemySprite = enemyFrameToSprite(state.enemyFrame);
+  requestAnimationFrame(loop);
+}
 
-  // Draw tiles
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const c = map[y][x];
-      const px = x * ts,
-        py = y * ts;
+// ─── Input ───────────────────────────────────────────────────────────────
 
-      ctx.drawImage(assets.bg, px, py, ts, ts);
+const KEY_MAP: Record<string, Direction> = {
+  KeyW: "up",
+  ArrowUp: "up",
+  KeyS: "down",
+  ArrowDown: "down",
+  KeyA: "left",
+  ArrowLeft: "left",
+  KeyD: "right",
+  ArrowRight: "right",
+};
 
-      if (c === CHAR.WALL) {
-        const v = getWallVariant(x, y, W, H);
-        ctx.drawImage(
-          assets.walls[v as keyof typeof assets.walls],
-          px,
-          py,
-          ts,
-          ts,
-        );
-      } else if (c === CHAR.COLLECT) {
-        ctx.drawImage(assets.chest, px, py, ts, ts);
-      } else if (c === CHAR.OPEN) {
-        ctx.drawImage(assets.chest_o, px, py, ts, ts);
-      } else if (c === CHAR.EXIT) {
-        ctx.drawImage(assets.exit, px, py, ts, ts);
-      } else if (c === CHAR.HUNTER) {
-        // Hunters: draw enemy with a red tint
-        ctx.drawImage(assets.enemy[enemySprite], px, py, ts, ts);
-        ctx.fillStyle = "rgba(255,60,60,0.35)";
-        ctx.fillRect(px, py, ts, ts);
-      } else if (
-        c === CHAR.ENEMY_R ||
-        c === CHAR.ENEMY_r ||
-        c === CHAR.ENEMY_l ||
-        c === CHAR.ENEMY_L
-      ) {
-        ctx.drawImage(assets.enemy[enemySprite], px, py, ts, ts);
-      }
+window.addEventListener("keydown", (e) => {
+  if (!state) return;
+
+  if (e.code === "Enter" || e.code === "Space") {
+    e.preventDefault();
+    if (state.status === "won") {
+      advanceLevel();
+    } else if (state.status === "dead") {
+      loadLevel(currentLevel);
     }
+    return;
   }
 
-  // Player
-  ctx.drawImage(assets.player, drawPX * ts, drawPY * ts, ts, ts);
+  if (state.status !== "playing") return;
 
-  // HUD
-  drawHUD(ctx, state, ts);
+  const dir = KEY_MAP[e.code];
+  if (!dir) return;
+  e.preventDefault();
+  state = tryMove(state, dir, performance.now());
+});
 
-  // Overlays
-  if (state.status === "won")
-    drawOverlay(
-      ctx,
-      "🏆 Você ganhou, mizerávi!",
-      "#22c55e",
-      "Enter → próximo nível",
-    );
-  if (state.status === "dead")
-    drawOverlay(
-      ctx,
-      "💀 Morreu, abestado!",
-      "#ef4444",
-      "Enter → tentar de novo",
-    );
+function bindBtn(id: string, dir: Direction): void {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const fire = (e: Event) => {
+    e.preventDefault();
+    if (state?.status === "playing")
+      state = tryMove(state, dir, performance.now());
+  };
+  btn.addEventListener("click", fire);
+  btn.addEventListener("touchstart", fire, { passive: false });
 }
 
-function drawHUD(
-  ctx: CanvasRenderingContext2D,
-  state: GameState,
-  ts: number,
-): void {
-  const pad = 8;
-  const left = `Movimentos: ${state.moves}   Coletáveis: ${state.collectLeft}`;
-  const right = `${state.level}/10`;
+// ─── Level management ─────────────────────────────────────────────────────
 
-  ctx.save();
-  ctx.font = `bold ${Math.max(11, Math.round(ts * 0.17))}px monospace`;
+function loadLevel(level: number): void {
+  currentLevel = Math.max(1, Math.min(level, LEVEL_COUNT));
+  const def = getLevelDef(currentLevel);
+  const parsed = parseMap(def.map);
 
-  // Left badge
-  const lm = ctx.measureText(left);
-  const bh = Math.max(22, Math.round(ts * 0.26));
-  drawBadge(ctx, pad, pad, lm.width + pad * 2, bh, "rgba(0,0,0,0.55)");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(left, pad * 2, pad + bh * 0.68);
+  if (parsed.error) {
+    console.error(`Level ${currentLevel} error:`, parsed.error);
+    return;
+  }
 
-  // Right level badge
-  const rm = ctx.measureText(right);
-  const rx = ctx.canvas.width - rm.width - pad * 3;
-  drawBadge(ctx, rx, pad, rm.width + pad * 2, bh, "rgba(203,166,247,0.3)");
-  ctx.fillStyle = "#e9d8fd";
-  ctx.fillText(right, rx + pad, pad + bh * 0.68);
+  const ts = computeTileSize(parsed.width, parsed.height);
+  canvas.width = parsed.width * ts;
+  canvas.height = parsed.height * ts;
 
-  ctx.restore();
+  state = initGameState(parsed, def, currentLevel, ts);
+  updateLevelBanner(def.name, def.subtitle);
 }
 
-function drawBadge(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fill: string,
-): void {
-  ctx.fillStyle = fill;
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 5);
-  ctx.fill();
+function advanceLevel(): void {
+  if (currentLevel >= LEVEL_COUNT) {
+    showEndScreen();
+    return;
+  }
+  loadLevel(currentLevel + 1);
 }
 
-function drawOverlay(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  color: string,
-  hint: string,
-): void {
-  const { width, height } = ctx.canvas;
-  ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,0.62)";
-  ctx.fillRect(0, 0, width, height);
+function updateLevelBanner(name: string, subtitle: string): void {
+  const el = document.getElementById("level-banner");
+  if (!el) return;
+  el.innerHTML = `<span class="lv-name">${name}</span><span class="lv-sub">${subtitle}</span>`;
 
-  const fs = Math.max(16, Math.min(28, Math.round(width / 18)));
-  ctx.font = `bold ${fs}px monospace`;
-  const tm = ctx.measureText(text);
-  const cw = tm.width + 48,
-    ch = fs * 2.8;
-  const cx = (width - cw) / 2,
-    cy = (height - ch) / 2 - ch * 0.3;
-
-  ctx.fillStyle = color + "cc";
-  ctx.beginPath();
-  ctx.roundRect(cx, cy, cw, ch, 10);
-  ctx.fill();
-
-  ctx.fillStyle = "#fff";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, cx + 24, cy + ch / 2);
-
-  // Hint text below
-  ctx.font = `${Math.round(fs * 0.65)}px monospace`;
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.textBaseline = "top";
-  const hm = ctx.measureText(hint);
-  ctx.fillText(hint, (width - hm.width) / 2, cy + ch + 10);
-
-  ctx.restore();
+  // Flash animation
+  el.classList.remove("flash");
+  void el.offsetWidth; // reflow
+  el.classList.add("flash");
 }
+
+function showEndScreen(): void {
+  const overlay = document.getElementById("end-overlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
+// ─── Window resize ─────────────────────────────────────────────────────────
+
+function onResize(): void {
+  if (!state) return;
+  const ts = computeTileSize(state.width, state.height);
+  canvas.width = state.width * ts;
+  canvas.height = state.height * ts;
+  state = { ...state, tileSize: ts };
+}
+
+// ─── Bootstrap ───────────────────────────────────────────────────────────
+
+async function init(): Promise<void> {
+  canvas = document.getElementById("game") as HTMLCanvasElement;
+  ctx = canvas.getContext("2d")!;
+
+  const loading = document.getElementById("loading")!;
+  const ui = document.getElementById("ui")!;
+
+  try {
+    assets = await loadAssets("/assets");
+  } catch {
+    loading.textContent = "❌ Erro ao carregar assets.";
+    return;
+  }
+
+  loading.style.display = "none";
+  ui.style.display = "flex";
+
+  // D-pad
+  bindBtn("btn-up", "up");
+  bindBtn("btn-down", "down");
+  bindBtn("btn-left", "left");
+  bindBtn("btn-right", "right");
+
+  // Restart current level
+  document
+    .getElementById("restart")!
+    .addEventListener("click", () => loadLevel(currentLevel));
+
+  // End screen restart
+  const endBtn = document.getElementById("end-restart");
+  if (endBtn)
+    endBtn.addEventListener("click", () => {
+      const ov = document.getElementById("end-overlay");
+      if (ov) ov.style.display = "none";
+      loadLevel(1);
+    });
+
+  window.addEventListener("resize", onResize);
+
+  loadLevel(1);
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener("DOMContentLoaded", init);
