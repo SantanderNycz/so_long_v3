@@ -355,7 +355,13 @@ function moveEnemies(state: GameState): GameState {
       ny = ey + ddy;
     if (ny < 0 || ny >= state.height || nx < 0 || nx >= state.width) continue;
     const tile = map[ny][nx];
-    if (tile === CHAR.WALL || isEnemy(tile) || tile === CHAR.EXIT) continue;
+    if (
+      tile === CHAR.WALL ||
+      isEnemy(tile) ||
+      tile === CHAR.EXIT ||
+      tile === CHAR.COLLECT
+    )
+      continue;
     if (nx === state.playerX && ny === state.playerY) {
       status = "dead";
       continue;
@@ -413,7 +419,13 @@ function bfsStep(
         ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= w || ny >= h || vis[ny][nx]) continue;
       const t = map[ny][nx];
-      if (t === CHAR.WALL || isEnemy(t) || t === CHAR.EXIT) continue;
+      if (
+        t === CHAR.WALL ||
+        isEnemy(t) ||
+        t === CHAR.EXIT ||
+        t === CHAR.COLLECT
+      )
+        continue;
       vis[ny][nx] = 1;
       prev[ny][nx] = [x, y];
       q.push([nx, ny]);
