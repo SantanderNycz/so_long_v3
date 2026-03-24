@@ -154,8 +154,8 @@ export function tryMove(
     toY: ny,
     startTime: now,
   };
-
-  map[py][px] = CHAR.FLOOR;
+  
+  map[py][px] = state.map[py][px] === CHAR.EXIT ? CHAR.EXIT : CHAR.FLOOR;
 
   let collectLeft = state.collectLeft;
   if (target === CHAR.COLLECT) {
